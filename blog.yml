@@ -1,6 +1,14 @@
 - hosts: all
   sudo: True
   user: vagrant
+  vars_files:
+    - vars/mysql.yml
+  roles:
+    - common
+    - mysql
+    - php
+    - nginx
+    - wordpress
   vars:
     mysql_root_password: root
     mysql_wp_user: wordpress
@@ -8,29 +16,14 @@
     wordpress_db_name: wordpress
 
   tasks:
-    - name: "Atualiza pacotes e instala nginx"
-      apt: name=nginx state=latest update_cache=yes install_recommends=yes
-
-    - name: "Instala PHP-FPM"
-      apt: name=php5-fpm state=latest install_recommends=yes
-
     - name: "Instala MySQL"
       apt: name=mysql-server state=latest install_recommends=yes
-
-    - name: "Instala extensoes do MySQL para PHP"
-      apt: name=php5-mysql state=latest install_recommends=yes
 
     - name: "Instala extensoes do MySQL para Python"
       apt: name=python-mysqldb state=latest install_recommends=yes
 
-    - name: "Copia configuracao do blog.nginx para /etc/nginx/sites-available/blog"
-      copy: src=blog.nginx dest=/etc/nginx/sites-available/blog
-
-    - name: "Apaga o site default"
-      file: path=/etc/nginx/sites-enabled/default state=abstent
-
-    - name: "Ativa o site"
-      file: src/etc/nginx/sites-available/blog dest=/etc/nginx/sites-enabled/blog state=link
+#    - name: "Apaga o site default"
+#      file: path=/etc/nginx/sites-available/default recurse=yes state=abstent
 
     - name: "Reinicia NGINX"
       service: name=nginx state=restarted
@@ -48,7 +41,7 @@
       file: path=/opt/wordpress recurse=yes owner=www-data group=www-data
 
     - name: "Inicia MySQL"
-      service: name=mysql state=started enable=true
+      service: name=mysql state=restarted sleep=2
 
     - name: "Cria .my.cnf"
       template: src=my.cnf.j2 dest=~/.my.cnf mode=0600
@@ -65,8 +58,7 @@
       mysql_db: name=wordpress login_user=root login_password="{{ mysql_root_password }}" state=present
 
     - name: "Cria usuario wordpress"
-      mysql_user: name="{{ mysql_wp_user }}" password="{{ mysql_wp_password }}" priv="{{ wordpress_db_name }}".*:ALL
-      check_implicit_admin=yes login_user=root login_password="{{ mysql_root_password }}" host="{{ item }}" state=present
+      mysql_user: name="{{ mysql_wp_user }}" password="{{ mysql_wp_password }}" priv="{{ wordpress_db_name }}.*:ALL" check_implicit_admin=yes login_user=root login_password="{{ mysql_root_password }}" host="{{ item }}" state=present
       with_items:
         - "{{ ansible_hostname }}"
         - 127.0.0.1
